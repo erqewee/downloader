@@ -1,5 +1,8 @@
-# downloader-for-PC
+# File Downloader
+- Best free file downloader, with Open Source!
 
-# Coded with
-[C#](https://docs.microsoft.com/en-us/dotnet/csharp/)
-and <br> I'm used [Visual Studio 2022 - Enterprise](https://visualstudio.microsoft.com/downloads)
+## Includes
+- [C#](https://dotnet.microsoft.com/en-us/languages/csharp)
+
+## IDE
+- [Visual Studio (Community)](https://visualstudio.microsoft.com/downloads)
