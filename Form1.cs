@@ -1,150 +1,177 @@
-﻿using AltoHttp;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Policy;
 using System.Text;
 using System.Windows.Forms;
 
+using AltoHttp;
+
 namespace Downloader
 {
-    public partial class Form1 : Form
+    public partial class Downloader : Form
     {
-        public Form1()
+        public Downloader()
         {
             InitializeComponent();
         }
 
-        public HttpDownloader client;
-        public string target = $"{Application.StartupPath}\\Downloads";
+        string PATH = $"{Application.StartupPath}\\Downloads";
 
-        private void LoadX()
+        public HttpDownloader Client;
+
+        private void Downloader_Load(object sender, EventArgs e)
         {
-            resumeButton.Enabled = false;
             downloadButton.Enabled = false;
-            fileExtension.Enabled = false;
             fileName.Enabled = false;
+            cancelButton.Enabled = false;
+            resumeButton.Enabled = false;
+            pauseButton.Enabled = false;
         }
 
-        private void downloadButton_Click(object sender, EventArgs e)
+        private void addDownload_Click(object sender, EventArgs e)
         {
+            string URL = targetURL.Text;
+            string NAME = fileName.Text;
 
-            if (fileExtension.Text == "" || fileExtension.Text == null)
+            if (selectDownloadFolder.SelectedPath != "")
             {
-                fileExtension.Text = "rar";
+                PATH = selectDownloadFolder.SelectedPath;
             }
 
-            if(fileName.Text == "" || fileName.Text == null)
+            if (!Directory.Exists(PATH))
             {
-                fileName.Text = "your_installed_file";
+                Directory.CreateDirectory(PATH);
             }
 
-            if (!Directory.Exists(target))
-            {
-                Directory.CreateDirectory(target);
-            }
+            Client = new HttpDownloader(URL, $"{PATH}\\{NAME}");
 
-            try
-            {
+            try { 
+                Client.DownloadCompleted += DownloadCompletedDataReceived;
+                Client.ProgressChanged += ProgressDataReceived;
 
-                client = new HttpDownloader(url.Text, $"{target}\\{fileName.Text}.{fileExtension.Text}");
+                Client.Start();
 
-                client.DownloadCompleted += DownloadCompleted;
-                client.ProgressChanged += ProgressChanged;
+                targetURL.Enabled = false;
+                targetURL.Text = "";
 
+                downloadButton.Text = "Downloading";
                 downloadButton.Enabled = false;
+
+                cancelButton.Enabled = true;
                 pauseButton.Enabled = true;
+            } catch {
+                targetURL.Enabled = true;
+                targetURL.Text = "Invalid URL detected.";
 
-                url.Enabled = false;
-                fileExtension.Enabled = false;
-                fileName.Enabled = false;
+                downloadButton.Text = "Download";
+                downloadButton.Enabled = false;
 
-                client.Start();
-
-            }
-            catch
-            {
-                statusLabel.Text = "Invalid URL";
-                downloadButton.Enabled = true;
-                return;
-            }
-
+                cancelButton.Enabled = false;
+                resumeButton.Enabled = false;
+                pauseButton.Enabled = false;
+            }; 
         }
 
-        private void ProgressChanged(object sender, AltoHttp.ProgressChangedEventArgs e)
-        {
-            progress.Value = (int)e.Progress;
-            labelProgress.Text = $"{e.Progress.ToString("0.00")}%";
-            speed.Text = string.Format("{0} MB/s", (e.SpeedInBytes / 1024d / 1024d).ToString("0.00"));
-
-            downloadLabel.Text = string.Format("{0} MB", (client.TotalBytesReceived / 1024d / 1024d).ToString("0.00"));
-            statusLabel.Text = "Downloading...";
-        }
-
-        private void DownloadCompleted(object sender, EventArgs e)
+        private void DownloadCompletedDataReceived(object sender, EventArgs args)
         {
             Invoke((MethodInvoker)delegate
             {
-                statusLabel.Text = $"Completed!";
-                labelProgress.Text = "100%";
-                speed.Text = "0.00 MB/s";
-                MessageBox.Show($"{target}\\{fileName.Text}.{fileExtension.Text}", "File downloaded successful!");
-
+                downloadButton.Text = "Download";
                 downloadButton.Enabled = true;
-                fileExtension.Enabled = true;
+
+                downloaded.Text = "Downloaded: 0MB";
+
+                speed.Text = "Speed: 0.00 MB/s";
+                MessageBox.Show($"{PATH}\\{fileName.Text}", "File downloaded successful!");
+
+                downloadProgress.Value = 0;
+
+                targetURL.Enabled = true;
                 fileName.Enabled = true;
                 pauseButton.Enabled = false;
+                cancelButton.Enabled = false;
                 resumeButton.Enabled = false;
-                url.Enabled = true;
+
+                if(RADButton.Checked)
+                {
+                    Process.Start($"{PATH}\\{fileName.Text}");
+                }
             });
         }
 
-        private void resumeButton_Click(object sender, EventArgs e)
+        private void ProgressDataReceived(object sender, AltoHttp.ProgressChangedEventArgs args)
         {
-            if (client != null)
-            {
-                client.Resume();
-            }
+            downloadProgress.Value = (int)args.Progress;
+            speed.Text = "Speed: " + string.Format("{0} MB/s", (args.SpeedInBytes / 1024d / 1024d).ToString("0.00"));
+            downloaded.Text = "Downloaded: " + string.Format("{0} MB", (args.TotalBytesReceived / 1024d / 1024d).ToString("0.00"));
+        }
 
-            resumeButton.Enabled = false;
-            pauseButton.Enabled = true;
+        private void targetURL_TextChanged(object sender, EventArgs e)
+        {
+            if(targetURL.Text.Contains(" ") || !targetURL.Text.StartsWith("http") || targetURL.Text == "" || targetURL.Text == null)
+            {
+                downloadButton.Enabled = false;
+                fileName.Enabled = false;
+            } else
+            {
+                downloadButton.Enabled = true;
+                fileName.Enabled = true;
+            }
+        }
+
+        private void selectDownloadPath_Click(object sender, EventArgs e)
+        {
+            selectDownloadFolder.ShowDialog();
+        }
+
+        private void cancelButton_Click(object sender, EventArgs e)
+        {
+            if(Client != null)
+            {
+                Client.StopReset();
+
+                targetURL.Enabled = true;
+                fileName.Enabled = true;
+
+                downloadButton.Text = "Download";
+                downloadButton.Enabled = true;
+
+                downloaded.Text = "Downloaded: 0MB";
+                downloadProgress.Value = 0;
+
+                cancelButton.Enabled = false;
+                pauseButton.Enabled = false;
+                resumeButton.Enabled = false;
+            }
         }
 
         private void pauseButton_Click(object sender, EventArgs e)
         {
-            if (client != null)
+            if (Client != null)
             {
-                client.Pause();
-            }
+                Client.Pause();
 
-            speed.Text = "0.00 MB/s";
-            resumeButton.Enabled = true;
-            pauseButton.Enabled = false;
-        }
+                downloadButton.Text = "Paused";
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            LoadX();
-        }
-
-        private void url_TextChanged(object sender, EventArgs e)
-        {
-            if (url.Text.Contains(" ") || url.Text == "" || url.Text == null)
-            {
-                downloadButton.Enabled = false;
-                fileExtension.Enabled = false;
-                fileName.Enabled = false;
-            }
-            else
-            {
-                downloadButton.Enabled = true;
-                fileExtension.Enabled = true;
-                fileName.Enabled = true;
+                cancelButton.Enabled = true;
+                pauseButton.Enabled = false;
+                resumeButton.Enabled = true;
             }
         }
 
-        private void downloads_Click(object sender, EventArgs e)
+        private void resumeButton_Click(object sender, EventArgs e)
         {
-            Process.Start(target);
+            if (Client != null)
+            {
+                Client.Resume();
+
+                downloadButton.Text = "Downloading";
+
+                cancelButton.Enabled = true;
+                pauseButton.Enabled = true;
+                resumeButton.Enabled = false;
+            }
         }
     }
 }
